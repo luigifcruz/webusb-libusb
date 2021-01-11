@@ -137,6 +137,15 @@ int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_han
 	return LIBUSB_ERROR_INVALID_PARAM;
 }
 
+int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle, int configuration) {
+	std::cout << "> " << __func__ << std::endl;
+
+	if (dev_handle != LIBUSB_DUMMY_HANDLE)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+
+}
+
 void libusb_exit(libusb_context *ctx) {
 	std::cout << "> " << __func__ << std::endl;
 	// nothing to do
@@ -158,3 +167,24 @@ int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev_handle, in
 	std::cout << "> " << __func__ << std::endl;
 }
 
+struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets) {
+	std::cout << "> " << __func__ << std::endl;
+}
+
+int LIBUSB_CALL libusb_cancel_transfer(struct libusb_transfer *transfer) {
+	std::cout << "> " << __func__ << std::endl;
+}
+
+int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number) {
+	std::cout << "> " << __func__ << std::endl;
+}
+
+int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
+	uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	unsigned char *data, uint16_t wLength, unsigned int timeout) {
+	std::cout << "> " << __func__ << std::endl;
+}
+
+void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer) {
+	std::cout << "> " << __func__ << std::endl;
+}
