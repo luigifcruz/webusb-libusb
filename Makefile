@@ -4,7 +4,7 @@ PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 CMAKE_LIBUSB_OPTS := -DLIBUSB_INCLUDE_DIR=$(BUILD_DIR)/include -DLIBUSB_LIBRARIES=$(BUILD_DIR)/lib
 CMAKE_INSTALL_OPTS := -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)
-WASM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind  -s SINGLE_FILE=1 -s ASYNCIFY -s WASM=1
+WASM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s SINGLE_FILE=1 -s ASYNCIFY -s WASM=1
 
 build_dir:
 	mkdir -p build
