@@ -1,0 +1,3 @@
+[submodule "rtl-sdr-blog"]
+	path = rtl-sdr-blog
+	url = https://github.com/rtlsdrblog/rtl-sdr-blog.git
