@@ -25,6 +25,12 @@
 #ifndef LIBUSB_H
 #define LIBUSB_H
 
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
+
 #if defined(_MSC_VER)
 /* on MS environments, the inline keyword is available in C++ only */
 #if !defined(__cplusplus)
@@ -1529,7 +1535,7 @@ static inline void libusb_fill_control_setup(unsigned char *buffer,
 }
 
 struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets);
-int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer);
+EXTERNC int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer);
 int LIBUSB_CALL libusb_cancel_transfer(struct libusb_transfer *transfer);
 void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer);
 void LIBUSB_CALL libusb_transfer_set_stream_id(
