@@ -1,5 +1,5 @@
 all: libusb external examples
- 
+
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 CMAKE_LIBUSB_OPTS := -DLIBUSB_INCLUDE_DIR=$(BUILD_DIR)/include -DLIBUSB_LIBRARIES=$(BUILD_DIR)/lib
@@ -56,4 +56,7 @@ libusb_list_devices: libusb example_dir
 airspy_list_devices: libusb airspy example_dir
 	em++ $(WASM_OPTS) -lairspy example/airspy_list_devices.cc -o build/example/airspy_list_devices.html
 
-examples: libusb_list_devices airspy_list_devices
+airspy_open: libusb airspy example_dir
+	em++ $(WASM_OPTS) -lairspy example/airspy_open.cc -o build/example/airspy_open.html
+
+examples: libusb_list_devices airspy_list_devices airspy_open
