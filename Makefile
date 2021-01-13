@@ -2,9 +2,13 @@ all: libusb external examples
 
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
+
+EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined  -g4
+EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
+
+CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"
 CMAKE_LIBUSB_OPTS := -DLIBUSB_INCLUDE_DIR=$(BUILD_DIR)/include -DLIBUSB_LIBRARIES=$(BUILD_DIR)/lib
 CMAKE_INSTALL_OPTS := -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)
-WASM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s SINGLE_FILE=1 -s ASYNCIFY -s WASM=1
 
 build_dir:
 	mkdir -p build
@@ -21,8 +25,8 @@ clean:
 
 libusb: build_dir
 	mkdir -p libusb/build
-	cd libusb/build && emcmake cmake $(CMAKE_INSTALL_OPTS) ..
-	cd libusb/build && emmake make -j8
+	cd libusb/build && emcmake cmake $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
+	cd libusb/build && emmake make -j8 VERBOSE=1
 	cd libusb/build && sudo emmake make install
 
 #
@@ -31,13 +35,13 @@ libusb: build_dir
 
 airspy: build_dir
 	mkdir -p external/airspyone_host/build
-	cd external/airspyone_host/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) ..
+	cd external/airspyone_host/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
 	cd external/airspyone_host/build && emmake make -j8
 	cd external/airspyone_host/build && sudo emmake make install
 
 rtlsdr: build_dir
 	mkdir -p external/rtl-sdr-blog/build
-	cd external/rtl-sdr-blog/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) ..
+	cd external/rtl-sdr-blog/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
 	cd external/rtl-sdr-blog/build && emmake make -j8
 	cd external/rtl-sdr-blog/build && sudo emmake make install
 
@@ -51,12 +55,15 @@ example_dir: build_dir
 	mkdir -p build/example
 
 libusb_list_devices: libusb example_dir
-	em++ $(WASM_OPTS) example/libusb_list_devices.cc -o build/example/libusb_list_devices.html
+	em++ $(EM_OPTS) example/libusb_list_devices.cc -o build/example/libusb_list_devices.html
 
 airspy_list_devices: libusb airspy example_dir
-	em++ $(WASM_OPTS) -lairspy example/airspy_list_devices.cc -o build/example/airspy_list_devices.html
+	em++ $(EM_OPTS) -lairspy example/airspy_list_devices.cc -o build/example/airspy_list_devices.html
 
 airspy_open: libusb airspy example_dir
-	em++ $(WASM_OPTS) -lairspy example/airspy_open.cc -o build/example/airspy_open.html
+	em++ $(EM_OPTS) -lairspy example/airspy_open.cc -o build/example/airspy_open.html
 
-examples: libusb_list_devices airspy_list_devices airspy_open
+pthread: libusb example_dir
+	em++ $(EM_OPTS) example/pthread.cc -o build/example/pthread.html
+
+examples: libusb_list_devices airspy_list_devices airspy_open pthread

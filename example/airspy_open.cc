@@ -5,13 +5,19 @@ extern "C" {
 #include <libairspy/airspy.h>
 }
 
+#include <emscripten.h>
+
 int callback(airspy_transfer_t* transfer) {
     std::cout << transfer->sample_count << std::endl;
 
-    return 0;
+    for (int i = 0; i < 16; i++)
+        std::cout << *(float*)(&transfer->samples+(i*8)) << std::endl;
+
+    return 1;
 }
 
 int main() {
+    int r = AIRSPY_SUCCESS;
     std::cout << "Hello from WASM C++." << std::endl;
 
     struct airspy_device *device;
@@ -45,10 +51,12 @@ int main() {
         return 1;
     }
 
-    if (airspy_start_rx(device, callback, nullptr) != AIRSPY_SUCCESS) {
-        std::cerr << "Error airspy_start_rx()." << std::endl;
+    if ((r = airspy_start_rx(device, callback, NULL)) != AIRSPY_SUCCESS) {
+        std::cerr << "Error airspy_start_rx(): " << r << std::endl;
         return 1;
     }
+
+    emscripten_sleep(1000);
 
     std::cout << "AIRSPY SUCCESSFUL" << std::endl;
 

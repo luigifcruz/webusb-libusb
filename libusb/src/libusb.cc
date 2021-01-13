@@ -4,6 +4,7 @@
 #include <iterator>
 #include <bitset>
 
+#include <emscripten.h>
 #include <emscripten/val.h>
 
 #include "libusb.h"
@@ -17,6 +18,23 @@ using namespace emscripten;
 #define LIBUSB_SN_ID            ((uint8_t)3)
 
 val device = val::object();
+struct pending_transfer * pending_transfers = NULL;
+struct pending_transfer {
+    struct libusb_transfer * transfer;
+    struct pending_transfer * next;
+    struct pending_transfer * previous;
+};
+
+val create_out_buffer(uint8_t* buffer, size_t size) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+    auto arr = val::global("Uint8Array").new_(size);
+    for (int i = 0; i < size; i++)
+        arr.set(i, (uint8_t)*(buffer+i));
+    return arr;
+#else
+    return val(typed_memory_view(size, buffer));
+#endif
+}
 
 const struct libusb_version* libusb_get_version(void) {
     std::cout << "> " << __func__ << std::endl;
@@ -226,7 +244,7 @@ int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
     }
 
     if ((request_type & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT) {
-        auto buf = val(typed_memory_view(wLength, data));
+        auto buf = create_out_buffer(data, wLength);
         val res = device.call<val>("controlTransferOut", setup, buf).await();
 
         if (res["status"].as<std::string>().compare("ok"))
@@ -265,6 +283,83 @@ int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned cha
 
 int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     std::cout << "> " << __func__ << std::endl;
+
+    unsigned char num = transfer->endpoint & ~LIBUSB_ENDPOINT_DIR_MASK;
+
+    // TODO: Throw some C++ at this. Code by marcnewlin/webusb-libusb-shim.
+    if (pending_transfers == NULL)
+        pending_transfers = (struct pending_transfer*)calloc(1, sizeof(struct pending_transfer));
+
+    struct pending_transfer* t = (struct pending_transfer*)calloc(1, sizeof(struct pending_transfer));
+    t->transfer = transfer;
+
+    struct pending_transfer * p = pending_transfers;
+    while(p->next != NULL) {
+        p = p->next;
+    }
+
+    t->previous = p;
+    p->next = t;
+
+    transfer->status = (enum libusb_transfer_status)-1;
+
+    if (device.as<val>() == val::undefined())
+        return LIBUSB_ERROR_NO_DEVICE;
+
+    if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
+        switch(transfer->type) {
+            case LIBUSB_TRANSFER_TYPE_BULK: {
+                val res = device.call<val>("transferIn", num, transfer->length).await();
+
+                if (res["status"].as<std::string>().compare("ok"))
+                    return LIBUSB_ERROR_IO;
+
+                auto buf = res["data"]["buffer"].as<std::string>();
+                std::copy(buf.begin(), buf.end(), transfer->buffer);
+
+                transfer->actual_length = res["data"]["buffer"]["byteLength"].as<int>();
+                if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+                    transfer->status = LIBUSB_TRANSFER_COMPLETED;
+                }
+
+                return LIBUSB_SUCCESS;
+            }
+            case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+                std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_BULK_STREAM" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_CONTROL:
+                std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_CONTROL" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+                std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_INTERRUPT" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+                std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_ISOCHRONOUS" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+        }
+    }
+
+    if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT) {
+        switch(transfer->type) {
+            case LIBUSB_TRANSFER_TYPE_BULK:
+                std::cout << "Not implemented: OUT LIBUSB_TRANSFER_TYPE_BULK" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+                std::cout << "Not implemented: OUT LIBUSB_TRANSFER_TYPE_BULK_STREAM" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_CONTROL:
+                std::cout << "Not implemented: OUT LIBUSB_TRANSFER_TYPE_CONTROL" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+                std::cout << "Not implemented: OUT LIBUSB_TRANSFER_TYPE_INTERRUPT" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+            case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+                std::cout << "Not implemented: OUT LIBUSB_TRANSFER_TYPE_ISOCHRONOUS" << std::endl;
+                return LIBUSB_ERROR_NOT_SUPPORTED;
+        }
+    }
+
+    return LIBUSB_ERROR_OTHER;
 }
 
 void libusb_exit(libusb_context *ctx) {
@@ -291,4 +386,17 @@ void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer) {
 int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
 	struct timeval *tv, int *completed) {
     std::cout << "> " << __func__ << std::endl;
+
+    // TODO: Some C++ here too.
+    struct pending_transfer * p = pending_transfers;
+    while(p->next != NULL) {
+        p = p->next;
+        if(p->transfer->status == LIBUSB_TRANSFER_COMPLETED ||
+            p->transfer->status == LIBUSB_TRANSFER_CANCELLED) {
+            p->transfer->callback(p->transfer);
+            p->transfer->status = (enum libusb_transfer_status)-1;
+        }
+    }
+
+    return LIBUSB_SUCCESS;
 }
