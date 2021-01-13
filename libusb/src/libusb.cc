@@ -3,21 +3,22 @@
 #include <vector>
 #include <iterator>
 #include <bitset>
+#include <thread>
 
 #include <emscripten.h>
 #include <emscripten/val.h>
 
+#include "threads_posix.h"
 #include "libusb.h"
+#include "libusbi.h"
 
 using namespace emscripten;
 
-#define LIBUSB_DUMMY_DEVICE     ((libusb_device*)0xca)
-#define LIBUSB_DUMMY_HANDLE     ((libusb_device_handle*)0xfe)
 #define LIBUSB_MANUFACTURER_ID  ((uint8_t)1)
 #define LIBUSB_PRODUCT_ID       ((uint8_t)2)
 #define LIBUSB_SN_ID            ((uint8_t)3)
 
-val device = val::object();
+val _webusb_dev = val::object();
 struct pending_transfer * pending_transfers = NULL;
 struct pending_transfer {
     struct libusb_transfer * transfer;
@@ -27,10 +28,10 @@ struct pending_transfer {
 
 val create_out_buffer(uint8_t* buffer, size_t size) {
 #ifdef __EMSCRIPTEN_PTHREADS__
-    auto arr = val::global("Uint8Array").new_(size);
-    for (int i = 0; i < size; i++)
-        arr.set(i, (uint8_t)*(buffer+i));
-    return arr;
+    auto tmp = val(typed_memory_view(size, buffer));
+    auto buf = val::global("Uint8Array").new_(size);
+    buf.call<val>("set", tmp);
+    return buf;
 #else
     return val(typed_memory_view(size, buffer));
 #endif
@@ -59,17 +60,22 @@ int libusb_init(libusb_context**) {
 ssize_t libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
     std::cout << "> " << __func__ << std::endl;
 
-    val usb = val::global("navigator")["usb"];
-
     val filter = val::object();
     filter.set("filters", val::array());
-    device = usb.call<val>("requestDevice", filter).await();
 
-    if (!device.as<bool>())
+    val usb = val::global("navigator")["usb"];
+    _webusb_dev = usb.call<val>("requestDevice", filter).await();
+
+    if (!_webusb_dev.as<bool>())
         return LIBUSB_ERROR_NO_DEVICE;
 
-    libusb_device** l = (libusb_device**)malloc(sizeof(libusb_device*) * 2);
-    l[0] = LIBUSB_DUMMY_DEVICE;
+    struct libusb_device* _dev;
+    _dev = (struct libusb_device*)calloc(1, sizeof(struct libusb_device));
+    _dev->device = &_webusb_dev;
+
+    libusb_device** l;
+    l = (libusb_device**)malloc(sizeof(libusb_device*) * 2);
+    l[0] = _dev;
     l[1] = nullptr;
     *list = l;
 
@@ -79,7 +85,11 @@ ssize_t libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
 int libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descriptor *desc) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev != LIBUSB_DUMMY_DEVICE)
+    if (dev == nullptr)
+        return LIBUSB_ERROR_INVALID_PARAM;
+
+    val device = *dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     desc->bLength = LIBUSB_DT_DEVICE_SIZE;
@@ -111,12 +121,17 @@ void libusb_free_device_list(libusb_device **list, int unref_devices) {
 int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handle) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev != LIBUSB_DUMMY_DEVICE)
+    val device = *dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
+    val::global().set("device", device);
     device.call<val>("open").await();
 
-    *dev_handle = LIBUSB_DUMMY_HANDLE;
+    struct libusb_device_handle* _dev_handle;
+    _dev_handle = (struct libusb_device_handle*)calloc(1, sizeof(*_dev_handle));
+    _dev_handle->dev = dev;
+    *dev_handle = _dev_handle;
 
     return LIBUSB_SUCCESS;
 }
@@ -124,8 +139,11 @@ int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handl
 void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return;
+
+    std::cout << "close" << std::endl;
 
     device.call<val>("close").await();
 }
@@ -134,7 +152,8 @@ int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_han
     uint8_t desc_index, unsigned char *data, int length) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     std::string str;
@@ -159,7 +178,8 @@ int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_han
 int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle, int configuration) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     device.call<val>("selectConfiguration", configuration).await();
@@ -170,10 +190,13 @@ int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle, int c
 int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     device.call<val>("claimInterface", interface_number).await();
+
+    std::cout << "a" << std::endl;
 
     return LIBUSB_SUCCESS;
 }
@@ -181,7 +204,8 @@ int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle, int int
 int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev_handle, int interface_number) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     device.call<val>("releaseInterface", interface_number).await();
@@ -194,7 +218,8 @@ int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
     unsigned char *data, uint16_t wLength, unsigned int timeout) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     val setup = val::object();
@@ -269,7 +294,8 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets) {
 int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint) {
     std::cout << "> " << __func__ << std::endl;
 
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    val device = *dev_handle->dev->device;
+    if (!device.as<bool>())
         return LIBUSB_ERROR_INVALID_PARAM;
 
     std::string direction = ((endpoint & LIBUSB_ENDPOINT_DIR_MASK)
@@ -284,6 +310,9 @@ int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned cha
 int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     std::cout << "> " << __func__ << std::endl;
 
+    MAIN_THREAD_EM_ASM(return device);
+
+    val device = *transfer->dev_handle->dev->device;
     unsigned char num = transfer->endpoint & ~LIBUSB_ENDPOINT_DIR_MASK;
 
     // TODO: Throw some C++ at this. Code by marcnewlin/webusb-libusb-shim.
@@ -303,8 +332,8 @@ int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
 
     transfer->status = (enum libusb_transfer_status)-1;
 
-    if (device.as<val>() == val::undefined())
-        return LIBUSB_ERROR_NO_DEVICE;
+    if (!device.as<bool>())
+        return LIBUSB_ERROR_INVALID_PARAM;
 
     if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
         switch(transfer->type) {

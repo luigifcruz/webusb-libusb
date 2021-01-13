@@ -3,7 +3,7 @@ all: libusb external examples
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
-EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined  -g4
+EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -g4
 EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"

@@ -1,10 +1,6 @@
 #include <iostream>
 
-extern "C" {
-#include "libusb.h"
 #include <libairspy/airspy.h>
-}
-
 #include <emscripten.h>
 
 int callback(airspy_transfer_t* transfer) {

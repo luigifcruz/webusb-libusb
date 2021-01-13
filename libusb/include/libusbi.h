@@ -35,6 +35,8 @@
 #include <sys/time.h>
 #endif
 
+#include <emscripten/val.h>
+
 #include "libusb.h"
 
 /* Not all C standard library headers define static_assert in assert.h
@@ -493,6 +495,8 @@ struct libusb_device {
 
     struct libusb_device_descriptor device_descriptor;
     usbi_atomic_t attached;
+
+    emscripten::val* device;
 };
 
 struct libusb_device_handle {
