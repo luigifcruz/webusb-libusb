@@ -289,6 +289,8 @@ int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     if (val::global("device").as<val>() == val::undefined())
         yeet = true; // yeeting threads with dogshit binding
 
+    transfer->status = (enum libusb_transfer_status)99;
+
     if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
         switch(transfer->type) {
             case LIBUSB_TRANSFER_TYPE_BULK: {
@@ -380,6 +382,7 @@ int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev_handle) {
 
 int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev_handle, int interface_number) {
     std::cout << "> " << __func__ << std::endl;
+    return LIBUSB_SUCCESS;
 }
 
 int LIBUSB_CALL libusb_cancel_transfer(struct libusb_transfer *transfer) {
@@ -404,8 +407,8 @@ int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
             transfer->status == LIBUSB_TRANSFER_CANCELLED) {
             transfer->callback(transfer);
             pending_transfers.erase(pending_transfers.begin() + pos);
-            pos += 1;
         }
+        pos += 1;
     }
 
     return LIBUSB_SUCCESS;

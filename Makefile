@@ -3,7 +3,7 @@ all: libusb external examples
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
-EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined  -g4 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]'
+EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined -g4 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=1048576
 EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"
@@ -33,17 +33,17 @@ libusb: build_dir
 # Build External
 #
 
+liquiddsp: build_dir
+	mkdir -p external/liquid-dsp/build
+	cd external/liquid-dsp/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
+	cd external/liquid-dsp/build && emmake make -j8
+	cd external/liquid-dsp/build && sudo emmake make install
+
 airspy: build_dir
 	mkdir -p external/airspyone_host/build
 	cd external/airspyone_host/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
 	cd external/airspyone_host/build && emmake make -j8
 	cd external/airspyone_host/build && sudo emmake make install
-
-rtlsdr: build_dir
-	mkdir -p external/rtl-sdr-blog/build
-	cd external/rtl-sdr-blog/build && emcmake cmake $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
-	cd external/rtl-sdr-blog/build && emmake make -j8
-	cd external/rtl-sdr-blog/build && sudo emmake make install
 
 external: airspy
 
@@ -66,4 +66,4 @@ airspy_open: libusb airspy example_dir
 rtlsdr_open: libusb example_dir
 	em++ $(EM_OPTS) -lrtlsdr example/rtlsdr_open.cc -o build/example/rtlsdr_open.html
 
-examples: libusb_list_devices airspy_list_devices airspy_open rtlsdr_open
+examples: libusb_list_devices airspy_list_devices airspy_open
