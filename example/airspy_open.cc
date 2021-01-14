@@ -1,19 +1,11 @@
 #include <iostream>
 
-extern "C" {
-#include "libusb.h"
 #include <libairspy/airspy.h>
-}
-
 #include <emscripten.h>
 
 int callback(airspy_transfer_t* transfer) {
-    std::cout << transfer->sample_count << std::endl;
-
-    for (int i = 0; i < 16; i++)
-        std::cout << *(float*)(&transfer->samples+(i*8)) << std::endl;
-
-    return 1;
+    std::cout << "Out Samples: " << transfer->sample_count << std::endl;
+    return 0;
 }
 
 int main() {
@@ -56,7 +48,7 @@ int main() {
         return 1;
     }
 
-    emscripten_sleep(1000);
+    emscripten_sleep(10000);
 
     std::cout << "AIRSPY SUCCESSFUL" << std::endl;
 

@@ -3,7 +3,7 @@ all: libusb external examples
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
-EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined  -g4
+EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined  -g4 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]'
 EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"
@@ -63,7 +63,7 @@ airspy_list_devices: libusb airspy example_dir
 airspy_open: libusb airspy example_dir
 	em++ $(EM_OPTS) -lairspy example/airspy_open.cc -o build/example/airspy_open.html
 
-pthread: libusb example_dir
-	em++ $(EM_OPTS) example/pthread.cc -o build/example/pthread.html
+rtlsdr_open: libusb example_dir
+	em++ $(EM_OPTS) -lrtlsdr example/rtlsdr_open.cc -o build/example/rtlsdr_open.html
 
-examples: libusb_list_devices airspy_list_devices airspy_open pthread
+examples: libusb_list_devices airspy_list_devices airspy_open rtlsdr_open
