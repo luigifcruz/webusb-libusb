@@ -7,6 +7,7 @@
 
 #include <emscripten.h>
 #include <emscripten/val.h>
+#include <emscripten/threading.h>
 
 #include "libusb.h"
 
@@ -279,59 +280,39 @@ int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned cha
     return LIBUSB_SUCCESS;
 }
 
+int transfer_bulk_in(unsigned int endpoint, struct libusb_transfer *transfer) {
+    val res = val::global("device").call<val>("transferIn", endpoint, transfer->length).await();
+
+    if (res["status"].as<std::string>().compare("ok"))
+        return LIBUSB_ERROR_IO;
+
+    auto buf = res["data"]["buffer"].as<std::string>();
+    std::copy(buf.begin(), buf.end(), transfer->buffer);
+
+    transfer->actual_length = res["data"]["buffer"]["byteLength"].as<int>();
+    if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+        transfer->status = LIBUSB_TRANSFER_COMPLETED;
+    }
+
+    return LIBUSB_SUCCESS;
+}
+
 int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     std::cout << "> " << __func__ << std::endl;
 
-    bool yeet = false;
     pending_transfers.push_back(transfer);
     unsigned char num = transfer->endpoint & ~LIBUSB_ENDPOINT_DIR_MASK;
 
-    if (val::global("device").as<val>() == val::undefined())
-        yeet = true; // yeeting threads with dogshit binding
+    if (val::global("device").as<val>() == val::undefined() && emscripten_is_main_runtime_thread())
+        return LIBUSB_ERROR_NO_DEVICE;
 
     transfer->status = (enum libusb_transfer_status)99;
 
     if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
         switch(transfer->type) {
             case LIBUSB_TRANSFER_TYPE_BULK: {
-                if (yeet) {
-                    // TODO: I hate this shit. Re-write with EMVAL when possible.
-                    transfer->actual_length = MAIN_THREAD_EM_ASM_INT({
-                        return Asyncify.handleSleep(wakeUp => {
-                            device.transferIn($0, $1)
-                            .then((re) => {
-                                if (re.status !== "ok") wakeUp(0);
-                                let view = new Uint8Array(re.data.buffer);
-                                writeArrayToMemory(view, $2);
-                                wakeUp(re.data.byteLength);
-                            })
-                            .catch((err) => {
-                                console.log(err);
-                            });
-                        });
-                    }, num, transfer->length, transfer->buffer);
-
-                    if (transfer->actual_length == 0)
-                        return LIBUSB_ERROR_IO;
-
-                    if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
-                        transfer->status = LIBUSB_TRANSFER_COMPLETED;
-                    }
-                } else {
-                    val res = val::global("device").call<val>("transferIn", num, transfer->length).await();
-
-                    if (res["status"].as<std::string>().compare("ok"))
-                        return LIBUSB_ERROR_IO;
-
-                    auto buf = res["data"]["buffer"].as<std::string>();
-                    std::copy(buf.begin(), buf.end(), transfer->buffer);
-
-                    transfer->actual_length = res["data"]["buffer"]["byteLength"].as<int>();
-                    if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
-                        transfer->status = LIBUSB_TRANSFER_COMPLETED;
-                    }
-                }
-                return LIBUSB_SUCCESS;
+                return emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_III,
+                        transfer_bulk_in, num, transfer);
             }
             case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
                 std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_BULK_STREAM" << std::endl;
