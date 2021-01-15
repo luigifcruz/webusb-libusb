@@ -1,26 +1,21 @@
+#include <vector>
+#include <complex>
 #include <iostream>
 
 #include <libairspy/airspy.h>
 #include <emscripten/bind.h>
 
-//#define DJ_FFT_IMPLEMENTATION
-#include "dj_fft.h"
+struct airspy_device *device;
 
 int callback(airspy_transfer_t* transfer) {
-    //std::cout << "Out Samples: " << transfer->sample_count << std::endl;
+    size_t size = transfer->sample_count;
+    auto buf = static_cast<std::complex<float>*>(transfer->samples);
+    std::vector<std::complex<float>> data(buf, buf + size);
 
-    size_t size = transfer->sample_count * 2;
-
-    std::complex<float>* buf = (std::complex<float>*)malloc(size * sizeof(float));
-    memcpy(buf, transfer->samples, size * sizeof(float));
-    free(buf);
-
-    std::cout << buf[0] << std::endl;
+    std::cout << "Data Size: " <<  data.size() << " | First Sample: " << data[0] << std::endl;
 
     return 0;
 }
-
-struct airspy_device *device;
 
 int main() {
     int r = AIRSPY_SUCCESS;
@@ -56,7 +51,7 @@ int main() {
         return 1;
     }
 
-    if ((r = airspy_start_rx(device, callback, NULL)) != AIRSPY_SUCCESS) {
+    if ((r = airspy_start_rx(device, callback, nullptr)) != AIRSPY_SUCCESS) {
         std::cerr << "Error airspy_start_rx(): " << r << std::endl;
         return 1;
     }

@@ -5,7 +5,7 @@ project(usb-1.0 VERSION 1.0)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_library(usb-1.0 src/libusb.cc)
+add_library(usb-1.0 src/libusb.cc src/interface.cc)
 
 target_include_directories(usb-1.0 PUBLIC include)
 

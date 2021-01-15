@@ -7,9 +7,8 @@
 
 #include <emscripten.h>
 #include <emscripten/val.h>
-#include <emscripten/threading.h>
 
-#include "libusb.h"
+#include "interface.h"
 
 using namespace emscripten;
 
@@ -32,16 +31,14 @@ val create_out_buffer(uint8_t* buffer, size_t size) {
 #endif
 }
 
-const struct libusb_version* libusb_get_version(void) {
+const struct libusb_version* _libusb_get_version(void) {
     std::cout << "> " << __func__ << std::endl;
 
     static struct libusb_version info = {1, 0, 24, 0};
     return &info;
 };
 
-int libusb_init(libusb_context**) {
-    std::cout << "> " << __func__ << std::endl;
-
+int _libusb_init(libusb_context**) {
     val navigator = val::global("navigator");
 
     if (!navigator["usb"].as<bool>()) {
@@ -52,9 +49,7 @@ int libusb_init(libusb_context**) {
     return LIBUSB_SUCCESS;
 };
 
-ssize_t libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
-    std::cout << "> " << __func__ << std::endl;
-
+ssize_t _libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
     val usb = val::global("navigator")["usb"];
 
     val filter = val::object();
@@ -74,9 +69,7 @@ ssize_t libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
     return 1;
 }
 
-int libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descriptor *desc) {
-    std::cout << "> " << __func__ << std::endl;
-
+int _libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descriptor *desc) {
     if (dev != LIBUSB_DUMMY_DEVICE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -102,14 +95,11 @@ int libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descri
     return LIBUSB_SUCCESS;
 }
 
-void libusb_free_device_list(libusb_device **list, int unref_devices) {
-    std::cout << "> " << __func__ << std::endl;
+void _libusb_free_device_list(libusb_device **list, int unref_devices) {
     free(list);
 }
 
-int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handle) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_open(libusb_device *dev, libusb_device_handle **dev_handle) {
     if (dev != LIBUSB_DUMMY_DEVICE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -120,19 +110,15 @@ int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handl
     return LIBUSB_SUCCESS;
 }
 
-void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle) {
-    std::cout << "> " << __func__ << std::endl;
-
+void LIBUSB_CALL _libusb_close(libusb_device_handle *dev_handle) {
     if (dev_handle)
         return;
 
     val::global("device").call<val>("close").await();
 }
 
-int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
+int LIBUSB_CALL _libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
     uint8_t desc_index, unsigned char *data, int length) {
-    std::cout << "> " << __func__ << std::endl;
-
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -155,9 +141,7 @@ int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_han
     return LIBUSB_ERROR_INVALID_PARAM;
 }
 
-int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle, int configuration) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_set_configuration(libusb_device_handle *dev_handle, int configuration) {
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -166,9 +150,7 @@ int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle, int c
     return LIBUSB_SUCCESS;
 }
 
-int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number) {
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -177,9 +159,7 @@ int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle, int int
     return LIBUSB_SUCCESS;
 }
 
-int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev_handle, int interface_number) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_release_interface(libusb_device_handle *dev_handle, int interface_number) {
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -188,11 +168,9 @@ int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev_handle, int i
     return LIBUSB_SUCCESS;
 }
 
-int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
+int LIBUSB_CALL _libusb_control_transfer(libusb_device_handle *dev_handle,
     uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
     unsigned char *data, uint16_t wLength, unsigned int timeout) {
-    std::cout << "> " << __func__ << std::endl;
-
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -255,9 +233,7 @@ int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
     return LIBUSB_ERROR_OTHER;
 }
 
-struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets) {
-    std::cout << "> " << __func__ << std::endl;
-
+struct libusb_transfer * LIBUSB_CALL _libusb_alloc_transfer(int iso_packets) {
     size_t alloc_size =
 		sizeof(struct libusb_transfer) +
 		(sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets);
@@ -265,9 +241,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets) {
     return (struct libusb_transfer*)malloc(alloc_size);
 }
 
-int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint) {
     if (dev_handle != LIBUSB_DUMMY_HANDLE)
         return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -280,30 +254,11 @@ int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle, unsigned cha
     return LIBUSB_SUCCESS;
 }
 
-int transfer_bulk_in(unsigned int endpoint, struct libusb_transfer *transfer) {
-    val res = val::global("device").call<val>("transferIn", endpoint, transfer->length).await();
-
-    if (res["status"].as<std::string>().compare("ok"))
-        return LIBUSB_ERROR_IO;
-
-    auto buf = res["data"]["buffer"].as<std::string>();
-    std::copy(buf.begin(), buf.end(), transfer->buffer);
-
-    transfer->actual_length = res["data"]["buffer"]["byteLength"].as<int>();
-    if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
-        transfer->status = LIBUSB_TRANSFER_COMPLETED;
-    }
-
-    return LIBUSB_SUCCESS;
-}
-
-int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
-    std::cout << "> " << __func__ << std::endl;
-
+int LIBUSB_CALL _libusb_submit_transfer(struct libusb_transfer *transfer) {
     pending_transfers.push_back(transfer);
     unsigned char num = transfer->endpoint & ~LIBUSB_ENDPOINT_DIR_MASK;
 
-    if (val::global("device").as<val>() == val::undefined() && emscripten_is_main_runtime_thread())
+    if (val::global("device").as<val>() == val::undefined())
         return LIBUSB_ERROR_NO_DEVICE;
 
     transfer->status = (enum libusb_transfer_status)99;
@@ -311,8 +266,20 @@ int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
         switch(transfer->type) {
             case LIBUSB_TRANSFER_TYPE_BULK: {
-                return emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_III,
-                        transfer_bulk_in, num, transfer);
+                val res = val::global("device").call<val>("transferIn", num, transfer->length).await();
+
+                if (res["status"].as<std::string>().compare("ok"))
+                    return LIBUSB_ERROR_IO;
+
+                auto buf = res["data"]["buffer"].as<std::string>();
+                std::copy(buf.begin(), buf.end(), transfer->buffer);
+
+                transfer->actual_length = res["data"]["buffer"]["byteLength"].as<int>();
+                if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+                    transfer->status = LIBUSB_TRANSFER_COMPLETED;
+                }
+
+                return LIBUSB_SUCCESS;
             }
             case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
                 std::cout << "Not implemented: IN LIBUSB_TRANSFER_TYPE_BULK_STREAM" << std::endl;
@@ -352,36 +319,29 @@ int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer) {
     return LIBUSB_ERROR_OTHER;
 }
 
-void libusb_exit(libusb_context *ctx) {
-    std::cout << "> " << __func__ << std::endl;
+void _libusb_exit(libusb_context *ctx) {
     // nothing to do
 }
 
-int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev_handle) {
-    std::cout << "> " << __func__ << std::endl;
+int LIBUSB_CALL _libusb_reset_device(libusb_device_handle *dev_handle) {
 }
 
-int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev_handle, int interface_number) {
-    std::cout << "> " << __func__ << std::endl;
+int LIBUSB_CALL _libusb_kernel_driver_active(libusb_device_handle *dev_handle, int interface_number) {
     return LIBUSB_SUCCESS;
 }
 
-int LIBUSB_CALL libusb_cancel_transfer(struct libusb_transfer *transfer) {
-    std::cout << "> " << __func__ << std::endl;
+int LIBUSB_CALL _libusb_cancel_transfer(struct libusb_transfer *transfer) {
 }
 
-void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer) {
-    std::cout << "> " << __func__ << std::endl;
+void LIBUSB_CALL _libusb_free_transfer(struct libusb_transfer *transfer) {
 }
 
-int LIBUSB_CALL libusb_handle_events_timeout(libusb_context *ctx, struct timeval *tv) {
+int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *ctx, struct timeval *tv) {
     return libusb_handle_events_timeout_completed(ctx, tv, nullptr);
 }
 
-int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
+int LIBUSB_CALL _libusb_handle_events_timeout_completed(libusb_context *ctx,
 	struct timeval *tv, int *completed) {
-    std::cout << "> " << __func__ << std::endl;
-
     int pos = 0;
     for (const auto& transfer : pending_transfers) {
         if (transfer->status == LIBUSB_TRANSFER_COMPLETED ||
