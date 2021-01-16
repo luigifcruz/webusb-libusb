@@ -1,6 +1,6 @@
 [submodule "airspyone_host"]
 	path = external/airspyone_host
 	url = git@ggithub.com/airspy/airspyone_host.git
-[submodule "external/rtl-sdr-blog"]
-	path = external/rtl-sdr-blog
-	url = git@github.com:rtlsdrblog/rtl-sdr-blog.git
+[submodule "external/kfr"]
+	path = external/kfr
+	url = git@github.com:kfrlib/kfr.git

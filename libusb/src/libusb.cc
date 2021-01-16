@@ -4,6 +4,8 @@
 #include <iterator>
 #include <bitset>
 #include <thread>
+#include <iterator>
+#include <mutex>
 
 #include <emscripten.h>
 #include <emscripten/val.h>
@@ -18,17 +20,15 @@ using namespace emscripten;
 #define LIBUSB_PRODUCT_ID       ((uint8_t)2)
 #define LIBUSB_SN_ID            ((uint8_t)3)
 
-std::vector<struct libusb_transfer*> pending_transfers;
+std::mutex mutex;
+std::vector<struct libusb_transfer*> transfers;
+std::vector<struct libusb_transfer*> staging;
 
 val create_out_buffer(uint8_t* buffer, size_t size) {
-#ifdef __EMSCRIPTEN_PTHREADS__
     auto tmp = val(typed_memory_view(size, buffer));
     auto buf = val::global("Uint8Array").new_(size);
     buf.call<val>("set", tmp);
     return buf;
-#else
-    return val(typed_memory_view(size, buffer));
-#endif
 }
 
 const struct libusb_version* _libusb_get_version(void) {
@@ -255,13 +255,15 @@ int LIBUSB_CALL _libusb_clear_halt(libusb_device_handle *dev_handle, unsigned ch
 }
 
 int LIBUSB_CALL _libusb_submit_transfer(struct libusb_transfer *transfer) {
-    pending_transfers.push_back(transfer);
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        staging.push_back(transfer);
+    }
+
     unsigned char num = transfer->endpoint & ~LIBUSB_ENDPOINT_DIR_MASK;
 
     if (val::global("device").as<val>() == val::undefined())
         return LIBUSB_ERROR_NO_DEVICE;
-
-    transfer->status = (enum libusb_transfer_status)99;
 
     if ((transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN) {
         switch(transfer->type) {
@@ -331,9 +333,11 @@ int LIBUSB_CALL _libusb_kernel_driver_active(libusb_device_handle *dev_handle, i
 }
 
 int LIBUSB_CALL _libusb_cancel_transfer(struct libusb_transfer *transfer) {
+    transfer->status = LIBUSB_TRANSFER_CANCELLED;
 }
 
 void LIBUSB_CALL _libusb_free_transfer(struct libusb_transfer *transfer) {
+    free(transfer);
 }
 
 int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *ctx, struct timeval *tv) {
@@ -342,15 +346,23 @@ int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *ctx, struct timeva
 
 int LIBUSB_CALL _libusb_handle_events_timeout_completed(libusb_context *ctx,
 	struct timeval *tv, int *completed) {
-    int pos = 0;
-    for (const auto& transfer : pending_transfers) {
-        if (transfer->status == LIBUSB_TRANSFER_COMPLETED ||
-            transfer->status == LIBUSB_TRANSFER_CANCELLED) {
-            transfer->callback(transfer);
-            pending_transfers.erase(pending_transfers.begin() + pos);
-        }
-        pos += 1;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::move(staging.begin(), staging.end(), std::back_inserter(transfers));
+        staging.clear();
     }
+
+    transfers.erase(
+    std::remove_if(transfers.begin(), transfers.end(),
+        [](struct libusb_transfer* transfer) {
+            if (transfer->status == LIBUSB_TRANSFER_COMPLETED ||
+                transfer->status == LIBUSB_TRANSFER_CANCELLED) {
+                transfer->callback(transfer);
+                return true;
+            }
+            return false;
+        }),
+    transfers.end());
 
     return LIBUSB_SUCCESS;
 }

@@ -1,6 +1,7 @@
+#include <vector>
+#include <complex>
 #include <iostream>
 
-#include <emscripten.h>
 #include <samurai/samurai.hpp>
 
 using namespace Samurai;
@@ -28,9 +29,10 @@ int main() {
     {
         ASSERT_SUCCESS(device.StartStream());
 
-        float buffer[2048];
-        ASSERT_SUCCESS(device.ReadStream(rx, (float*)&buffer, 1024, 1000));
-        printf(">> %lf\n", buffer[0]);
+        size_t size = 2048;
+        std::vector<std::complex<float>> data(size);
+        ASSERT_SUCCESS(device.ReadStream(rx, data.data(), size, 1000));
+        std::cout << data[1] << std::endl;
 
         ASSERT_SUCCESS(device.StopStream());
     }

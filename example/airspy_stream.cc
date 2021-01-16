@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include <libairspy/airspy.h>
-#include <emscripten/bind.h>
+#include <emscripten.h>
 
 struct airspy_device *device;
 
@@ -56,18 +56,18 @@ int main() {
         return 1;
     }
 
-    return 0;
-}
+    emscripten_sleep(1000*5);
 
-void stop() {
+    std::cout << "release" << std::endl;
+
     if (airspy_stop_rx(device) != AIRSPY_SUCCESS) {
         std::cerr << "Error airspy_stop_rx()."<< std::endl;
-        return;
+        return 1;
     }
 
-    std::cout << "AIRSPY SUCCESSFUL" << std::endl;
-}
+    airspy_close(device);
 
-EMSCRIPTEN_BINDINGS(my_module) {
-    emscripten::function("stop", &stop);
+    std::cout << "AIRSPY SUCCESSFUL" << std::endl;
+
+    return 0;
 }
