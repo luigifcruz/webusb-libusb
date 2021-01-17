@@ -1,6 +1,9 @@
 [submodule "airspyone_host"]
 	path = external/airspyone_host
 	url = git@ggithub.com/airspy/airspyone_host.git
-[submodule "external/kfr"]
-	path = external/kfr
-	url = git@github.com:kfrlib/kfr.git
+[submodule "external/liquid-dsp"]
+	path = external/liquid-dsp
+	url = git@github.com:jgaeddert/liquid-dsp.git
+[submodule "external/samurai"]
+	path = external/samurai
+	url = git@github.com:luigifcruz/samurai.git

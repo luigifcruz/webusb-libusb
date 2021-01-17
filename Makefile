@@ -3,7 +3,8 @@ all: libusb external examples
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
-EM_FLAGS := -s USE_PTHREADS=1 -s WASM=1 -fsanitize=undefined -g4 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' --profiling -s ASYNCIFY_STACK_SIZE=10000 -s ALLOW_MEMORY_GROWTH=1 -s PROXY_TO_PTHREAD=1
+EM_DEBUG := -g4 --profiling
+EM_FLAGS := $(EM_DEBUG) -O3 -s USE_PTHREADS=1 -s WASM=1 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=10000 -s ALLOW_MEMORY_GROWTH=1 -s PROXY_TO_PTHREAD=1
 EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"
@@ -17,6 +18,7 @@ clean:
 	sudo rm -fr build
 	sudo rm -fr external/airspyone_host/build
 	sudo rm -fr external/samurai/build
+	sudo rm -fr external/liquid-dsp/build
 	sudo rm -fr libusb/build
 
 #
@@ -33,7 +35,14 @@ libusb: build_dir
 # Build External
 #
 
+liquid: build_dir
+	cd external/liquid-dsp && bash bootstrap.sh
+	cd external/liquid-dsp && emconfigure ./configure --build=x86_64 --target=x86_64 --host=x86_64 -C CFLAGS='-O3' --prefix=$(BUILD_DIR) ..
+	cd external/liquid-dsp && emmake make -j8
+	cd external/liquid-dsp && sudo emmake make install
+
 samurai: build_dir airspy
+	sudo rm -fr external/samurai/build
 	cd external/samurai && meson . build --cross-file target/emscripten.txt --prefix $(BUILD_DIR)
 	cd external/samurai/build && ninja
 	cd external/samurai/build && sudo ninja install
@@ -44,7 +53,7 @@ airspy: build_dir
 	cd external/airspyone_host/build && emmake make -j8
 	cd external/airspyone_host/build && sudo emmake make install
 
-external: airspy
+external: airspy samurai liquid
 
 #
 # Build Examples
@@ -62,7 +71,10 @@ airspy_list_devices: libusb airspy example_dir
 airspy_stream: libusb airspy example_dir
 	em++ $(EM_OPTS) -lairspy example/airspy_stream.cc -o build/example/airspy_stream.html
 
-samurai_stream: libusb
+samurai_stream: libusb airspy samurai
 	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai example/samurai_stream.cc -o build/example/samurai_stream.html
 
-examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream
+samurai_radio: libusb airspy liquid samurai
+	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
+
+examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream samurai_radio
