@@ -20,16 +20,25 @@ clean:
 	sudo rm -fr external/samurai/build
 	sudo rm -fr external/liquid-dsp/build
 	sudo rm -fr libusb/build
+	sudo rm -fr audiocontext/build
 
 #
-# Build LibUSB Shim
+# Build Libraries
 #
+
+audiocontext: build_dir
+	mkdir -p audiocontext/build
+	cd audiocontext/build && emcmake cmake $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
+	cd audiocontext/build && emmake make -j8
+	cd audiocontext/build && sudo emmake make install
 
 libusb: build_dir
 	mkdir -p libusb/build
 	cd libusb/build && emcmake cmake $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
-	cd libusb/build && emmake make -j8 VERBOSE=1
+	cd libusb/build && emmake make -j8
 	cd libusb/build && sudo emmake make install
+
+libs: audiocontext libusb
 
 #
 # Build External
@@ -53,7 +62,7 @@ airspy: build_dir
 	cd external/airspyone_host/build && emmake make -j8
 	cd external/airspyone_host/build && sudo emmake make install
 
-external: airspy samurai liquid
+external: airspy samurai #liquid
 
 #
 # Build Examples
@@ -74,7 +83,10 @@ airspy_stream: libusb airspy example_dir
 samurai_stream: libusb airspy samurai
 	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai example/samurai_stream.cc -o build/example/samurai_stream.html
 
-samurai_radio: libusb airspy liquid samurai
+samurai_radio: libusb airspy samurai liquid
 	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
 
-examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream samurai_radio
+audiocontext_test: audiocontext
+	em++ $(EM_OPTS) --std=c++17 -laudiocontext example/audiocontext_test.cc -o build/example/audiocontext_test.html
+
+examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream samurai_radio audiocontext_test

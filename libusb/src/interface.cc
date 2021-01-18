@@ -5,8 +5,6 @@
 #include "libusb.h"
 #include "interface.h"
 
-//#define DEBUG_TRACE
-
 const struct libusb_version* libusb_get_version(void) {
 #ifdef DEBUG_TRACE
     std::cout << "> " << __func__ << std::endl;

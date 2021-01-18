@@ -5,8 +5,6 @@
 #include <samurai/samurai.hpp>
 
 extern "C" {
-#include <OpenAL/al.h>
-#include <OpenAL/alc.h>
 #include <liquid/liquid.h>
 }
 
@@ -32,57 +30,19 @@ int main() {
     channelState.frequency = 96.9e6;
     ASSERT_SUCCESS(device.UpdateChannel(rx, channelState));
 
-    ALCdevice *dev = NULL;
-    ALCcontext *ctx = NULL;
-
-    const char *defname = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
-    std::cout << "Default device: " << defname << std::endl;
-
-    dev = alcOpenDevice(defname);
-    ctx = alcCreateContext(dev, NULL);
-    alcMakeContextCurrent(ctx);
 
 
-    /* Create buffer to store samples */
-    ALuint buf;
-    alGenBuffers(1, &buf);
-    al_check_error();
+    {
+        ASSERT_SUCCESS(device.StartStream());
 
-    /* Fill buffer with Sine-Wave */
-    float freq = 440.f;
-    int seconds = 4;
-    unsigned sample_rate = 22050;
-    size_t buf_size = seconds * sample_rate;
+        while (1) {
+            size_t size = 2048;
+            std::vector<std::complex<float>> data(size);
+            ASSERT_SUCCESS(device.ReadStream(rx, data.data(), size, 1000));
+        }
 
-    short *samples;
-    samples = new short[buf_size];
-    for(int i=0; i<buf_size; ++i) {
-        samples[i] = 32760 * sin( (2.f*float(M_PI)*freq)/sample_rate * i );
+        ASSERT_SUCCESS(device.StopStream());
     }
-
-    /* Download buffer to OpenAL */
-    alBufferData(buf, AL_FORMAT_MONO16, samples, buf_size, sample_rate);
-    al_check_error();
-
-
-    /* Set-up sound source and play buffer */
-    ALuint src = 0;
-    alGenSources(1, &src);
-    alSourcei(src, AL_BUFFER, buf);
-    alSourcePlay(src);
-
-    /* While sound is playing, sleep */
-    al_check_error();
-    emscripten_sleep(1000*seconds);
-
-    ALCdevice *dev = NULL;
-    ALCcontext *ctx = NULL;
-    ctx = alcGetCurrentContext();
-    dev = alcGetContextsDevice(ctx);
-
-    alcMakeContextCurrent(NULL);
-    alcDestroyContext(ctx);
-    alcCloseDevice(dev);
 
     return 0;
 }
