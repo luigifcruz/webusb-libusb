@@ -1,4 +1,5 @@
 #include <iostream>
+#include <math.h>
 #include <vector>
 
 #include <emscripten.h>
@@ -9,27 +10,23 @@ int main(int argc, char **argv) {
 
   emscripten_sleep(1000);
 
-  std::vector<float> samples(44100);
+  std::vector<float> samples(48000);
 
-  int i = 0;
-  for (auto& sample : samples) {
-      sample = (float)i++;
-      if (i > 100)
-        i = 0;
-  }
+  for (int i = 0; i < samples.size(); i++)
+      samples[i] = sin(2*M_PI*15e3/48000*i);
 
   std::vector<float*> channels = {
       samples.data(),
   };
 
   audiocontext_config cfg{};
-  cfg.sample_rate = 44100;
+  cfg.sample_rate = 48000;
   audiocontext_init(&cfg);
 
-  audiocontext_feed(channels.data(), channels.size(), samples.size(), 44100);
-
-  std::cout << "Now playing..." << std::endl;
-  emscripten_sleep(1000);
+  for (int i = 0; i < 10; i++) {
+    audiocontext_feed(channels.data(), channels.size(), samples.size(), 48000);
+    emscripten_sleep(1000);
+  }
 
   audiocontext_close();
 

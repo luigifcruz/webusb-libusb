@@ -56,7 +56,7 @@ void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle) {
 #ifdef DEBUG_TRACE
     std::cout << "> " << __func__ << std::endl;
 #endif
-    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, _libusb_close,
+    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VI, _libusb_close,
             dev_handle);
 }
 
@@ -130,7 +130,7 @@ void libusb_exit(libusb_context *ctx) {
 #ifdef DEBUG_TRACE
     std::cout << "> " << __func__ << std::endl;
 #endif
-    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, _libusb_exit,
+    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VI, _libusb_exit,
             ctx);
 }
 
@@ -162,7 +162,7 @@ void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer) {
 #ifdef DEBUG_TRACE
     std::cout << "> " << __func__ << std::endl;
 #endif
-    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, _libusb_free_transfer,
+    emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VI, _libusb_free_transfer,
             transfer);
 }
 

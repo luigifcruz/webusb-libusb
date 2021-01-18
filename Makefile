@@ -4,7 +4,7 @@ PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
 EM_DEBUG := -g4 --profiling
-EM_FLAGS := $(EM_DEBUG) -O3 -s USE_PTHREADS=1 -s WASM=1 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=10000 -s ALLOW_MEMORY_GROWTH=1 -s PROXY_TO_PTHREAD=1
+EM_FLAGS := $(EM_DEBUG) -O3 -s USE_PTHREADS=1 -s WASM=1 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=10000 -s INITIAL_MEMORY=64MB -s PROXY_TO_PTHREAD=1
 EM_OPTS := -I./build/include/ -L./build/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_FLAGS)" -DCMAKE_C_FLAGS="$(EM_FLAGS)"
@@ -83,8 +83,8 @@ airspy_stream: libusb airspy example_dir
 samurai_stream: libusb airspy samurai
 	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai example/samurai_stream.cc -o build/example/samurai_stream.html
 
-samurai_radio: libusb airspy samurai liquid
-	em++ $(EM_OPTS) --std=c++17 -lairspy -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
+samurai_radio: libusb airspy samurai audiocontext #liquid
+	em++ $(EM_OPTS) --std=c++17 -laudiocontext -lairspy -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
 
 audiocontext_test: audiocontext
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext example/audiocontext_test.cc -o build/example/audiocontext_test.html

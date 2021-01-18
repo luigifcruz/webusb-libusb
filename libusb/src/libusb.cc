@@ -334,6 +334,7 @@ int LIBUSB_CALL _libusb_kernel_driver_active(libusb_device_handle *dev_handle, i
 
 int LIBUSB_CALL _libusb_cancel_transfer(struct libusb_transfer *transfer) {
     transfer->status = LIBUSB_TRANSFER_CANCELLED;
+    return LIBUSB_SUCCESS;
 }
 
 void LIBUSB_CALL _libusb_free_transfer(struct libusb_transfer *transfer) {
