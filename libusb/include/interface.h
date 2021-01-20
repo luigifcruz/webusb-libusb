@@ -1,5 +1,16 @@
 #include "libusb.h"
 
+#include <emscripten/threading.h>
+
+typedef struct {
+    pthread_t worker;
+} webusb_context;
+
+typedef struct {
+    libusb_device* idev;
+    webusb_context* ctx;
+} device_context;
+
 const struct libusb_version* _libusb_get_version(void);
 
 int _libusb_init(libusb_context**);

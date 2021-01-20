@@ -23,7 +23,7 @@ int main() {
     //
     float demod_fs = 240e3;
     float output_fs = 48e3;
-    size_t buffer_size = 1024 * 1024 * 2;
+    size_t buffer_size = 1024 * 8;
     ////////
 
     auto device = Airspy::Device();

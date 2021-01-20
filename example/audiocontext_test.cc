@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   std::vector<float> samples(48000);
 
   for (int i = 0; i < samples.size(); i++)
-      samples[i] = sin(2*M_PI*15e3/48000*i);
+      samples[i] = sin(2*M_PI*50/48000*i);
 
   std::vector<float*> channels = {
       samples.data(),

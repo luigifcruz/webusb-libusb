@@ -9,6 +9,9 @@
 
 #include <emscripten.h>
 #include <emscripten/val.h>
+#include <emscripten/threading.h>
+
+#include "interface.h"
 
 using namespace emscripten;
 
@@ -114,13 +117,6 @@ int _libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descr
 }
 
 void _libusb_free_device_list(libusb_device **list, int unref_devices) {
-    if (unref_devices == 1) {
-        for (int i = 0; i < 100; i++) {
-            if (list[i] == nullptr)
-                break;
-            free(list[i]);
-        }
-    }
 
     free(list);
 }
@@ -134,7 +130,7 @@ int LIBUSB_CALL _libusb_open(libusb_device *dev, libusb_device_handle **dev_hand
     device.call<val>("open").await();
     val::global().set("device", device);
 
-    *dev_handle = LIBUSB_DUMMY_HANDLE;
+    //*dev_handle = LIBUSB_DUMMY_HANDLE;
 
     return LIBUSB_SUCCESS;
 }
@@ -148,8 +144,8 @@ void LIBUSB_CALL _libusb_close(libusb_device_handle *dev_handle) {
 
 int LIBUSB_CALL _libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
     uint8_t desc_index, unsigned char *data, int length) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     std::string str;
     switch (desc_index) {
@@ -171,8 +167,8 @@ int LIBUSB_CALL _libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 }
 
 int LIBUSB_CALL _libusb_set_configuration(libusb_device_handle *dev_handle, int configuration) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     val::global("device").call<val>("selectConfiguration", configuration).await();
 
@@ -180,8 +176,8 @@ int LIBUSB_CALL _libusb_set_configuration(libusb_device_handle *dev_handle, int 
 }
 
 int LIBUSB_CALL _libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     val::global("device").call<val>("claimInterface", interface_number).await();
 
@@ -189,8 +185,8 @@ int LIBUSB_CALL _libusb_claim_interface(libusb_device_handle *dev_handle, int in
 }
 
 int LIBUSB_CALL _libusb_release_interface(libusb_device_handle *dev_handle, int interface_number) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     val::global("device").call<val>("releaseInterface", interface_number).await();
 
@@ -200,8 +196,8 @@ int LIBUSB_CALL _libusb_release_interface(libusb_device_handle *dev_handle, int 
 int LIBUSB_CALL _libusb_control_transfer(libusb_device_handle *dev_handle,
     uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
     unsigned char *data, uint16_t wLength, unsigned int timeout) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     val setup = val::object();
     setup.set("request", bRequest);
@@ -271,8 +267,8 @@ struct libusb_transfer * LIBUSB_CALL _libusb_alloc_transfer(int iso_packets) {
 }
 
 int LIBUSB_CALL _libusb_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint) {
-    if (dev_handle != LIBUSB_DUMMY_HANDLE)
-        return LIBUSB_ERROR_INVALID_PARAM;
+    //if (dev_handle != LIBUSB_DUMMY_HANDLE)
+    //    return LIBUSB_ERROR_INVALID_PARAM;
 
     std::string direction = ((endpoint & LIBUSB_ENDPOINT_DIR_MASK)
             & LIBUSB_ENDPOINT_OUT) ? "out" : "in";

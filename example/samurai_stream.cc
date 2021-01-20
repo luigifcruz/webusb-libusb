@@ -40,7 +40,7 @@ int main() {
         auto end = std::chrono::system_clock::now();
 
         std::chrono::duration<double> elapsed_seconds = end-start;
-        std::cout << elapsed_seconds.count() << "s\n";
+        std::cout << "Finished 100 cycles in " << elapsed_seconds.count() << "s\n";
 
         ASSERT_SUCCESS(device.StopStream());
     }

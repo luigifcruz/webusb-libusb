@@ -30,9 +30,10 @@ void _audiocontext_feed(float** samples, size_t ch_n, size_t len, int fs) {
         auto out = val(typed_memory_view(len, samples[n]));
         buf.call<val>("getChannelData", n).call<void>("set", out);
     }
+
     val src = context.call<val>("createBufferSource");
     src.set("buffer", buf);
-    src.call<void>("connect", context["destination"]);
+    src.call<val>("connect", context["destination"]);
 
     double audioTime = val::global("audioTime").as<double>();
     double currentTime = context["currentTime"].as<double>();
