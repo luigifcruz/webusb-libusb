@@ -26,9 +26,9 @@ std::vector<struct libusb_transfer*> transfers;
 std::vector<struct libusb_transfer*> staging;
 
 val create_out_buffer(uint8_t* buffer, size_t size) {
+    auto tmp = val(typed_memory_view(size, buffer));
     auto buf = val::global("Uint8Array").new_(size);
-    for (int i = 0; i < size; i++)
-        buf.set(i, (uint8_t)*(buffer+i));
+    buf.call<val>("set", tmp);
     return buf;
 }
 
@@ -64,8 +64,8 @@ int _libusb_init(libusb_context**) {
 };
 
 ssize_t _libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
-    if (emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, pick_device) < 0)
-        return LIBUSB_ERROR_NO_DEVICE;
+    //if (emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, pick_device) < 0)
+    //    return LIBUSB_ERROR_NO_DEVICE;
 
     val devices = val::global("navigator")["usb"].call<val>("getDevices").await();
     int available = devices["length"].as<int>();
@@ -117,7 +117,6 @@ int _libusb_get_device_descriptor(libusb_device *dev, struct libusb_device_descr
 }
 
 void _libusb_free_device_list(libusb_device **list, int unref_devices) {
-
     free(list);
 }
 
