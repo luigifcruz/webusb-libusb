@@ -3,13 +3,52 @@
 #include <iostream>
 #include <fstream>
 
+#include <SDL.h>
+#include <stdlib.h>
 #include <audiocontext.h>
 #include <liquid/liquid.h>
 #include <samurai/samurai.hpp>
+#include <emscripten/threading.h>
 
 using namespace Samurai;
 
 bool keepgoing = true;
+
+SDL_Window *window = nullptr;
+SDL_Renderer *renderer;
+SDL_Surface *surface;
+
+void draw_sdl(std::complex<float>* fft, int size) {
+    if (!window) {
+        SDL_Init(SDL_INIT_VIDEO);
+        SDL_CreateWindowAndRenderer(512, 512, 0, &window, &renderer);
+        surface = SDL_CreateRGBSurface(0, 512, 512, 32, 0, 0, 0, 0);
+    }
+
+    if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
+
+    Uint8 * pixels = (uint8_t*)surface->pixels;
+
+    int j = 0;
+
+
+    for (int i=0; i < 1048576; i++) {
+        char randomByte = (uint8_t)((fft[j++].imag() * 1000)+127);
+        if (j > size)
+            j = 0;
+        pixels[i] = randomByte;
+    }
+
+    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
+
+    SDL_Texture *screenTexture = SDL_CreateTextureFromSurface(renderer, surface);
+
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, screenTexture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+
+    SDL_DestroyTexture(screenTexture);
+}
 
 int main() {
     std::cout << "Hello from WASM C++." << std::endl;
@@ -20,8 +59,9 @@ int main() {
     //
     float demod_fs = 240e3;
     float output_fs = 48e3;
-    size_t buffer_size = 1024 * 8;
+    size_t buffer_size = 1024 * 64;
     ////////
+
 
     auto device = AirspyHF::Device();
 
@@ -77,6 +117,8 @@ int main() {
     auto e_buf = (float**)calloc(1, sizeof(float**) * e_len);
     e_buf[0] = d_buf;
 
+    // Start SDL
+
     {
         ASSERT_SUCCESS(device.StartStream());
 
@@ -87,6 +129,11 @@ int main() {
 
             msresamp_crcf_execute(b_resamp, a_buf, len, b_buf, &len);
 
+
+            std::vector<std::complex<float>> data(a_buf, a_buf + a_len);
+            auto out = dj::fft1d(data, dj::fft_dir::DIR_FWD);
+            std::cout << data.size() << std::endl;
+
             for (size_t i = 0; i < len; i++)
                 agc_crcf_execute(agc, b_buf[i], &b_buf[i]);
 
@@ -95,6 +142,8 @@ int main() {
             msresamp_rrrf_execute(o_resamp, c_buf, len, d_buf, &len);
 
             audiocontext_feed(e_buf, e_len, len, output_fs);
+
+            emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VII, draw_sdl, out.data(), out.size());
         }
 
         ASSERT_SUCCESS(device.StopStream());

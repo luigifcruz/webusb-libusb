@@ -93,6 +93,9 @@ samurai_stream: libusb airspy airspyhf samurai
 samurai_radio: libusb airspy samurai audiocontext #liquid
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
 
+samurai_console: libusb airspy samurai audiocontext #liquid
+	em++ $(EM_OPTS) --std=c++17 -s USE_SDL=2 -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
+
 audiocontext_test: audiocontext
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext example/audiocontext_test.cc -o build/example/audiocontext_test.html
 

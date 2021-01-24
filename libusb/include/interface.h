@@ -1,6 +1,10 @@
+#ifndef INTERFACE_H
+#define INTERFACE_H
+
 #include "libusb.h"
 
 #include <emscripten/threading.h>
+#include <emscripten/val.h>
 
 typedef struct {
     pthread_t worker;
@@ -57,3 +61,5 @@ int LIBUSB_CALL _libusb_set_interface_alt_setting(libusb_device_handle*, int, in
 int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *, struct timeval *);
 
 int LIBUSB_CALL _libusb_handle_events_timeout_completed(libusb_context *, struct timeval *, int *);
+
+#endif
