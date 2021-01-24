@@ -13,7 +13,7 @@ void audiocontext_init(audiocontext_config* config) {
         config);
 }
 
-void audiocontext_feed(float** samples, size_t ch_n, size_t len, int fs) {
+void audiocontext_feed(float** samples, int ch_n, int len, int fs) {
 #ifdef DEBUG_TRACE
     std::cout << "> " << __func__ << std::endl;
 #endif

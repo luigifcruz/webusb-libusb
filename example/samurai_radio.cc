@@ -19,14 +19,14 @@ int main() {
 
     //////// USER CONFIG
     float freq = 96.9e6;
-    float samplerate = 2.5e6;
+    float samplerate = 256e3;
     //
     float demod_fs = 240e3;
     float output_fs = 48e3;
     size_t buffer_size = 1024 * 8;
     ////////
 
-    auto device = Airspy::Device();
+    auto device = AirspyHF::Device();
 
     Device::Config deviceConfig{};
     deviceConfig.sampleRate = samplerate;
@@ -59,7 +59,7 @@ int main() {
     agc_crcf_set_bandwidth(agc, 1e-3f);
 
     // Apply frequency demodulation.
-    freqdem dem = freqdem_create(85e3 / demod_fs);
+    freqdem dem = freqdem_create(100e3 / demod_fs);
 
     const size_t c_len = b_len;
     auto c_buf = (float*)malloc(sizeof(float) * c_len);
@@ -107,6 +107,12 @@ int main() {
     msresamp_rrrf_destroy(o_resamp);
     agc_crcf_destroy(agc);
     freqdem_destroy(dem);
+
+    free(a_buf);
+    free(b_buf);
+    free(c_buf);
+    free(d_buf);
+    free(e_buf);
 
     std::cout << "SAMURAI RADIO SUCCESSFUL" << std::endl;
 

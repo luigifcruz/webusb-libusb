@@ -52,6 +52,8 @@ int LIBUSB_CALL _libusb_cancel_transfer(struct libusb_transfer *);
 
 void LIBUSB_CALL _libusb_free_transfer(struct libusb_transfer *);
 
+int LIBUSB_CALL _libusb_set_interface_alt_setting(libusb_device_handle*, int, int);
+
 int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *, struct timeval *);
 
 int LIBUSB_CALL _libusb_handle_events_timeout_completed(libusb_context *, struct timeval *, int *);

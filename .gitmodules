@@ -7,3 +7,6 @@
 [submodule "external/samurai"]
 	path = external/samurai
 	url = git@github.com:luigifcruz/samurai.git
+[submodule "external/airspyhf"]
+	path = external/airspyhf
+	url = git@github.com:airspy/airspyhf.git

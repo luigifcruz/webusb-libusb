@@ -22,18 +22,19 @@ void _audiocontext_init(audiocontext_config* config) {
     val::global().set("audioTime", context["currentTime"].as<double>());
 }
 
-void _audiocontext_feed(float** samples, size_t ch_n, size_t len, int fs) {
+void _audiocontext_feed(float** samples, int ch_n, int len, int fs) {
     val context = val::global("audioContext");
 
     val buf = context.call<val>("createBuffer", ch_n, len, fs);
     for (int n = 0; n < ch_n; n++) {
         auto out = val(typed_memory_view(len, samples[n]));
-        buf.call<val>("getChannelData", n).call<void>("set", out);
+        buf.call<val>("getChannelData", int(n)).call<void>("set", val(out));
     }
+
 
     val src = context.call<val>("createBufferSource");
     src.set("buffer", buf);
-    src.call<val>("connect", context["destination"]);
+    src.call<void>(std::string("connect").c_str(), val(context["destination"]));
 
     double audioTime = val::global("audioTime").as<double>();
     double currentTime = context["currentTime"].as<double>();

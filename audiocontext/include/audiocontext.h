@@ -9,7 +9,7 @@ typedef struct {
 
 void audiocontext_init(audiocontext_config*);
 
-void audiocontext_feed(float**, size_t, size_t, int);
+void audiocontext_feed(float**, int, int, int);
 
 void audiocontext_close();
 

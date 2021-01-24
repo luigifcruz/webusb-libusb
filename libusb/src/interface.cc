@@ -7,7 +7,7 @@
 #include "libusb.h"
 #include "interface.h"
 
-#define DEBUG_TRACE
+//#define DEBUG_TRACE
 
 //
 // Helper functions.
@@ -259,6 +259,15 @@ int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
 #endif
     return emscripten_dispatch_to_thread_sync(wc(ctx)->worker, EM_FUNC_SIG_IIII, _libusb_handle_events_timeout_completed, nullptr,
             ctx, tv, completed);
+}
+
+int LIBUSB_CALL libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
+	int interface_number, int alternate_setting) {
+#ifdef DEBUG_TRACE
+    std::cout << "> " << __func__ << std::endl;
+#endif
+    return emscripten_dispatch_to_thread_sync(wc(dev_handle)->worker, EM_FUNC_SIG_IIII, _libusb_set_interface_alt_setting, nullptr,
+            nullptr, interface_number, alternate_setting);
 }
 
 //

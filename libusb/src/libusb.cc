@@ -28,7 +28,7 @@ std::vector<struct libusb_transfer*> staging;
 val create_out_buffer(uint8_t* buffer, size_t size) {
     auto tmp = val(typed_memory_view(size, buffer));
     auto buf = val::global("Uint8Array").new_(size);
-    buf.call<val>("set", tmp);
+    buf.call<val>("set", val(tmp));
     return buf;
 }
 
@@ -64,8 +64,8 @@ int _libusb_init(libusb_context**) {
 };
 
 ssize_t _libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
-    //if (emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, pick_device) < 0)
-    //    return LIBUSB_ERROR_NO_DEVICE;
+    if (emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, pick_device) < 0)
+        return LIBUSB_ERROR_NO_DEVICE;
 
     val devices = val::global("navigator")["usb"].call<val>("getDevices").await();
     int available = devices["length"].as<int>();
@@ -365,6 +365,12 @@ int LIBUSB_CALL _libusb_cancel_transfer(struct libusb_transfer *transfer) {
 
 void LIBUSB_CALL _libusb_free_transfer(struct libusb_transfer *transfer) {
     free(transfer);
+}
+
+int LIBUSB_CALL _libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
+	int interface_number, int alternate_setting) {
+    val::global("device").call<val>("selectAlternateInterface", interface_number, alternate_setting).await();
+    return LIBUSB_SUCCESS;
 }
 
 int LIBUSB_CALL _libusb_handle_events_timeout(libusb_context *ctx, struct timeval *tv) {
