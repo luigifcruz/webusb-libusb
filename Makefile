@@ -3,8 +3,8 @@ all: libusb external examples
 PWD_DIR := $(shell pwd)
 BUILD_DIR := $(PWD_DIR)/build
 
-EM_DEBUG := -g4 --profiling --source-map-base https://localhost:443/ -fsanitize=undefined
-EM_FLAGS := $(EM_DEBUG) -O3 -s USE_PTHREADS=1 -s WASM=1 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=10000 -s INITIAL_MEMORY=64MB -s PROXY_TO_PTHREAD=1
+EM_DEBUG := -msse -msimd128 -g4 --profiling --source-map-base https://localhost:443/ -fsanitize=undefined
+EM_FLAGS := $(EM_DEBUG) -O3 -s USE_PTHREADS=1 -s WASM=1 -s 'ASYNCIFY_IMPORTS=["emscripten_receive_on_main_thread_js"]' -s ASYNCIFY_STACK_SIZE=10000 -s INITIAL_MEMORY=128MB -s PROXY_TO_PTHREAD=1
 EM_OPTS := -I$(BUILD_DIR)/include/ -L$(BUILD_DIR)/lib/ -lusb-1.0 --bind -s ASYNCIFY $(EM_FLAGS)
 
 CMAKE_EM_OPTS := -DCMAKE_CXX_FLAGS="$(EM_OPTS)" -DCMAKE_C_FLAGS="$(EM_OPTS)"
@@ -20,6 +20,7 @@ clean:
 	sudo rm -fr external/airspyhf/build
 	sudo rm -fr external/samurai/build
 	sudo rm -fr external/liquid-dsp/build
+	sudo rm -fr external/fftw3/build
 	sudo rm -fr libusb/build
 	sudo rm -fr audiocontext/build
 
@@ -69,7 +70,13 @@ airspyhf: build_dir
 	cd external/airspyhf/build && emmake make -j8 VERBOSE=1
 	cd external/airspyhf/build && sudo emmake make install
 
-external: airspy airspyhf samurai liquid
+fftw3: build_dir
+	mkdir -p external/fftw3/build
+	cd external/fftw3/build && emcmake cmake -DENABLE_FLOAT=YES $(CMAKE_LIBUSB_OPTS) $(CMAKE_INSTALL_OPTS) $(CMAKE_EM_OPTS) ..
+	cd external/fftw3/build && emmake make -j8 VERBOSE=1
+	cd external/fftw3/build && sudo emmake make install
+
+external: airspy airspyhf samurai fftw3 liquid
 
 #
 # Build Examples
@@ -94,7 +101,7 @@ samurai_radio: libusb airspy samurai audiocontext #liquid
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
 
 samurai_console: libusb airspy samurai audiocontext #liquid
-	em++ $(EM_OPTS) --std=c++17 -s USE_SDL=2 -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/samurai_radio.cc -o build/example/samurai_radio.html
+	em++ $(EM_OPTS) --std=c++17 -s USE_SDL=2 -lfftw3f -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/samurai_console.cc -o build/example/samurai_console.html
 
 audiocontext_test: audiocontext
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext example/audiocontext_test.cc -o build/example/audiocontext_test.html

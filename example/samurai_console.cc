@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include <SDL.h>
+#include <fftw3.h>
 #include <stdlib.h>
 #include <audiocontext.h>
 #include <liquid/liquid.h>
@@ -18,25 +19,32 @@ SDL_Window *window = nullptr;
 SDL_Renderer *renderer;
 SDL_Surface *surface;
 
-void draw_sdl(std::complex<float>* fft, int size) {
+void draw_sdl(float* fft, int size) {
     if (!window) {
         SDL_Init(SDL_INIT_VIDEO);
-        SDL_CreateWindowAndRenderer(512, 512, 0, &window, &renderer);
-        surface = SDL_CreateRGBSurface(0, 512, 512, 32, 0, 0, 0, 0);
+        SDL_CreateWindowAndRenderer(1920, 510, 0, &window, &renderer);
+        surface = SDL_CreateRGBSurface(0, size, 255, 32, 0, 0, 0, 0);
     }
 
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
 
     Uint8 * pixels = (uint8_t*)surface->pixels;
 
-    int j = 0;
+    float max = 0;
+    for (int i=0; i < size; i++)
+        if (fft[i] > max)
+            max = fft[i];
 
+    for (int i=0; i < size*255*4; i++) {
+        pixels[i] = pixels[i]/1.25;
+    }
 
-    for (int i=0; i < 1048576; i++) {
-        char randomByte = (uint8_t)((fft[j++].imag() * 1000)+127);
-        if (j > size)
-            j = 0;
-        pixels[i] = randomByte;
+    for (int i=0; i < size; i++) {
+        int v = 255 - (uint8_t)(fft[i] * (255/max));
+        pixels[(((size*v)+i)*4)+0] = 255;
+        pixels[(((size*v)+i)*4)+1] = 255;
+        pixels[(((size*v)+i)*4)+2] = 255;
+        pixels[(((size*v)+i)*4)+3] = 255;
     }
 
     if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
@@ -59,9 +67,8 @@ int main() {
     //
     float demod_fs = 240e3;
     float output_fs = 48e3;
-    size_t buffer_size = 1024 * 64;
+    size_t buffer_size = 1024 * 2;
     ////////
-
 
     auto device = AirspyHF::Device();
 
@@ -117,11 +124,18 @@ int main() {
     auto e_buf = (float**)calloc(1, sizeof(float**) * e_len);
     e_buf[0] = d_buf;
 
-    // Start SDL
+    // Plan FFT
+    const size_t f_len = b_len;
+    auto f_buf = (std::complex<float>*)malloc(sizeof(std::complex<float>) * f_len);
+    fftwf_plan plan = fftwf_plan_dft_1d(f_len, reinterpret_cast<fftwf_complex*>(b_buf),
+            reinterpret_cast<fftwf_complex*>(f_buf), FFTW_FORWARD, FFTW_ESTIMATE);
+    const size_t g_len = f_len;
+    auto g_buf = (float*)malloc(sizeof(float) * g_len);
 
     {
         ASSERT_SUCCESS(device.StartStream());
 
+        int count = 0;
         while (keepgoing) {
             unsigned int len = a_len;
 
@@ -129,10 +143,24 @@ int main() {
 
             msresamp_crcf_execute(b_resamp, a_buf, len, b_buf, &len);
 
+            if ((count++ % 4) == 0) {
+                fftwf_execute(plan);
+                for (int i = 0; i < f_len; ++i) {
+                    if (i < f_len/2) {
+                        int fi = i + int((f_len/2) + 0.5);
+                        g_buf[i] = sqrt(f_buf[fi].real() * f_buf[fi].real() +
+                                        f_buf[fi].imag() * f_buf[fi].imag());
+                    }
 
-            std::vector<std::complex<float>> data(a_buf, a_buf + a_len);
-            auto out = dj::fft1d(data, dj::fft_dir::DIR_FWD);
-            std::cout << data.size() << std::endl;
+                    if (i > f_len/2) {
+                        int fi = i - int(f_len/2);
+                        g_buf[i] = sqrt(f_buf[fi].real() * f_buf[fi].real() +
+                                        f_buf[fi].imag() * f_buf[fi].imag());
+                    }
+                }
+
+                emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VII, draw_sdl, g_buf, g_len);
+            }
 
             for (size_t i = 0; i < len; i++)
                 agc_crcf_execute(agc, b_buf[i], &b_buf[i]);
@@ -142,8 +170,6 @@ int main() {
             msresamp_rrrf_execute(o_resamp, c_buf, len, d_buf, &len);
 
             audiocontext_feed(e_buf, e_len, len, output_fs);
-
-            emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VII, draw_sdl, out.data(), out.size());
         }
 
         ASSERT_SUCCESS(device.StopStream());
@@ -154,11 +180,15 @@ int main() {
     agc_crcf_destroy(agc);
     freqdem_destroy(dem);
 
+    fftwf_destroy_plan(plan);
+
     free(a_buf);
     free(b_buf);
     free(c_buf);
     free(d_buf);
     free(e_buf);
+    free(f_buf);
+    free(g_buf);
 
     std::cout << "SAMURAI RADIO SUCCESSFUL" << std::endl;
 
