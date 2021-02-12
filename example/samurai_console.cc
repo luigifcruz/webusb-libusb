@@ -97,6 +97,11 @@ void draw_sdl(uint8_t* fft, int width, int height, int idx) {
         window = SDL_CreateWindow("test", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                 1280, 500, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+                         "Missing file",
+                         "File is missing. Please reinstall the program.",
+                         NULL);
+
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
         SDL_GL_SetSwapInterval(0);
@@ -118,10 +123,10 @@ void draw_sdl(uint8_t* fft, int width, int height, int idx) {
 
         float vertices[] = {
             // positions          // texture coords
-             1.0f,  1.0f, 0.0f,   0.0f, 0.0f,   1.0f, 1.0f, // top right
-             1.0f, -1.0f, 0.0f,   0.0f, 1.0f,   1.0f, 0.0f, // bottom right
-            -1.0f, -1.0f, 0.0f,   1.0f, 1.0f,   0.0f, 0.0f, // bottom left
-            -1.0f,  1.0f, 0.0f,   1.0f, 0.0f,   0.0f, 1.0f, // top left
+             1.0f,  1.0f, 0.0f,   0.0f, 0.0f,   0.0f, 1.0f, // top right
+             1.0f, -1.0f, 0.0f,   0.0f, 1.0f,   0.0f, 0.0f, // bottom right
+            -1.0f, -1.0f, 0.0f,   1.0f, 1.0f,   1.0f, 0.0f, // bottom left
+            -1.0f,  1.0f, 0.0f,   1.0f, 0.0f,   1.0f, 1.0f, // top left
         };
 
         GLuint elements[] = {
@@ -220,6 +225,11 @@ void draw_sdl(uint8_t* fft, int width, int height, int idx) {
     SDL_GL_SwapWindow(window);
 }
 
+float ms(std::complex<float> n, float o = 1.0) {
+    n /= o;
+    return n.real() * n.real() + n.imag() * n.imag();
+}
+
 int main() {
     std::cout << "Hello from WASM C++." << std::endl;
 
@@ -229,7 +239,7 @@ int main() {
     //
     float demod_fs = 240e3;
     float output_fs = 48e3;
-    size_t buffer_size = 1024 * 2;
+    size_t buffer_size = 1024 * 8;
     ////////
 
     auto device = AirspyHF::Device();
@@ -265,7 +275,7 @@ int main() {
     agc_crcf_set_bandwidth(agc, 1e-3f);
 
     // Apply frequency demodulation.
-    freqdem dem = freqdem_create(100e3 / demod_fs);
+    freqdem dem = freqdem_create(85e3 / demod_fs);
 
     const size_t c_len = b_len;
     auto c_buf = (float*)malloc(sizeof(float) * c_len);
@@ -287,13 +297,42 @@ int main() {
     e_buf[0] = d_buf;
 
     // Plan FFT
-    const size_t f_len = b_len;
+    const size_t f_len = a_len;
     auto f_buf = (std::complex<float>*)malloc(sizeof(std::complex<float>) * f_len);
-    fftwf_plan plan = fftwf_plan_dft_1d(f_len, reinterpret_cast<fftwf_complex*>(b_buf),
+    fftwf_plan plan = fftwf_plan_dft_1d(f_len, reinterpret_cast<fftwf_complex*>(a_buf),
             reinterpret_cast<fftwf_complex*>(f_buf), FFTW_FORWARD, FFTW_ESTIMATE);
     const size_t g_len = f_len;
     auto g_buf = (float*)malloc(sizeof(float) * g_len);
 
+    // Apply Windowing
+    const size_t i_len = f_len;
+    auto i_buf = (float*)malloc(sizeof(float) * i_len);
+
+    float win_offset = 0.0;
+    for (int i=0; i < i_len; i++) {
+        i_buf[i] = liquid_hann(i, i_len);
+        win_offset += i_buf[i];
+    }
+    std::cout << "Window Offset: " << win_offset << std::endl;
+
+    // Calibration function by Youseff
+    for (int i = 0; i < a_len; i++) {
+        float real = i % 2 == 0 ? i_buf[i] : -i_buf[i];
+        a_buf[i] = std::complex<float>(real, 0.0);
+    }
+
+    fftwf_execute(plan);
+
+    float max_power = -1000.0f;
+    for (int i = 0; i < f_len; i++) {
+        float pwr = 20 * log10(ms(f_buf[i]));
+        if (max_power < pwr)
+            max_power = pwr;
+    }
+
+    std::cout << "Calibration Max Power: " << max_power << std::endl;
+
+    // Browser Buffer
     const size_t h_hei = 300;
     const size_t h_wid = g_len;
     const size_t h_len = h_wid * h_hei;
@@ -312,28 +351,31 @@ int main() {
             msresamp_crcf_execute(b_resamp, a_buf, len, b_buf, &len);
 
             if ((count++ % 4) == 0) {
-                fftwf_execute(plan);
-                for (int i = 0; i < f_len; ++i) {
-                    if (i < f_len/2) {
-                        int fi = i + int((f_len/2) + 0.5);
-                        g_buf[i] = sqrt(f_buf[fi].real() * f_buf[fi].real() +
-                                        f_buf[fi].imag() * f_buf[fi].imag());
-                    }
-
-                    if (i > f_len/2) {
-                        int fi = i - int(f_len/2);
-                        g_buf[i] = sqrt(f_buf[fi].real() * f_buf[fi].real() +
-                                        f_buf[fi].imag() * f_buf[fi].imag());
-                    }
+                for (size_t i = 0; i < i_len; i++) {
+                    a_buf[i] *= i_buf[i];
                 }
 
-                float max = 0;
-                for (int i=0; i < g_len; i++)
-                    if (g_buf[i] > max)
-                        max = g_buf[i];
+                fftwf_execute(plan);
 
-                for (int i=0; i < h_wid; i++)
-                    h_buf[(line*h_wid)+i] = (uint8_t)(g_buf[i] * (255/max));
+                for (int i = 0; i < f_len; i++) {
+                    int ix;
+
+                    if (i < f_len / 2)
+                        ix = (f_len / 2) + i;
+                    else
+                        ix = i - (f_len / 2);
+
+                    g_buf[i] = 10 * log10(ms(f_buf[ix], f_len));
+                    g_buf[i] += max_power;
+                    if (g_buf[i] < 0)
+                        g_buf[i] = 0;
+                    g_buf[i] /= max_power;
+                    g_buf[i] *= 255;
+                }
+
+                for (int i=0; i < h_wid; i++) {
+                    h_buf[(line*h_wid)+i] = (uint8_t)(g_buf[i]);
+                }
 
                 emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_VIIII, draw_sdl, h_buf, h_wid, h_hei, line);
 

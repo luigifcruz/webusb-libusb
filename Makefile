@@ -106,4 +106,7 @@ samurai_console: #libusb airspy samurai audiocontext #liquid
 audiocontext_test: audiocontext
 	em++ $(EM_OPTS) --std=c++17 -laudiocontext example/audiocontext_test.cc -o build/example/audiocontext_test.html
 
-examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream samurai_radio audiocontext_test
+cyberradio: #libusb airspy samurai audiocontext #liquid
+	em++ $(EM_OPTS) -s MODULARIZE=1 -s 'EXPORT_NAME="CyberRadioCore"' -s PROXY_TO_PTHREAD=0 --std=c++17 -laudiocontext -lairspy -lairspyhf -lsamurai -lliquid example/cyberradio.cc -o build/example/cyberradio.js
+
+examples: libusb_list_devices airspy_list_devices airspy_stream samurai_stream samurai_radio audiocontext_test cyberradio
