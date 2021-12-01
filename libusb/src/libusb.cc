@@ -66,7 +66,7 @@ ssize_t _libusb_get_device_list(libusb_context *ctx, libusb_device ***list) {
     if (available == 0)
         return LIBUSB_ERROR_NO_DEVICE;
 
-    libusb_device** l = (libusb_device**)malloc(sizeof(libusb_device*) * available + 1);
+    libusb_device** l = (libusb_device**)malloc(sizeof(libusb_device*) * (available + 1));
 
     for (int i = 0; i < available; i++) {
         auto device_id = (int*)malloc(sizeof(int));
