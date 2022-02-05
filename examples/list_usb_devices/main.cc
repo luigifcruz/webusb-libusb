@@ -2,7 +2,6 @@
 
 extern "C" {
 #include "libusb.h"
-#include <libairspy/airspy.h>
 }
 
 int main() {
@@ -34,6 +33,7 @@ int main() {
             std::cerr << "Error libusb_get_device_descriptor()." << std::endl;
             return 1;
         }
+        printf("ID = %04x:%04x\n", dd.idVendor, dd.idProduct);
     }
 
     libusb_free_device_list(list, 1);
